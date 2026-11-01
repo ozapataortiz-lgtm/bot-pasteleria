@@ -1,27 +1,62 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const PCR = require('puppeteer-chromium-resolver');
+const qrImage = require('qr-image');
+const fs = require('fs');
+const express = require('express');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+let qrActual = null;
+
+// Servidor web auxiliar para mostrar el QR en una pestaña limpia
+app.get('/', (req, res) => {
+    if (!qrActual) {
+        return res.send('<h1>El bot ya está conectado o el QR no se ha generado aún. Revisa la consola de Render.</h1>');
+    }
+    const code = qrImage.image(qrActual, { type: 'png' });
+    res.setHeader('Content-Type', 'image/png');
+    code.pipe(res);
+});
+
+app.listen(PORT, () => {
+    console.log(`Servidor web auxiliar corriendo en el puerto ${PORT}`);
+});
 
 async function iniciarBot() {
     const stats = await PCR({});
 
-    console.log('Iniciando entorno de Pastelería Elizabeth (Versión Limpia)...');
+    console.log('Iniciando entorno de Pastelería Elizabeth en la Nube con Enlace QR...');
 
     const client = new Client({
         authStrategy: new LocalAuth(),
         puppeteer: {
             executablePath: stats.executablePath,
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
+            headless: 'new',
+            args: [
+                '--no-sandbox', 
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
+                '--no-first-run',
+                '--no-zygote',
+                '--single-process'
+            ]
         }
     });
 
     client.on('qr', (qr) => {
-        console.log('--- ESCANEA ESTE CÓDIGO QR CON TU WHATSAPP ---');
+        qrActual = qr;
+        console.log('--- NUEVO CÓDIGO QR GENERADO ---');
+        console.log('👉 ABRE ESTE ENLACE EN TU NAVEGADOR PARA ESCANEAR EL QR PERFECTO:');
+        console.log(`https://onrender.com`);
+        console.log('--------------------------------');
         qrcode.generate(qr, { small: true });
     });
 
     client.on('ready', () => {
-        console.log('¡El bot de Pastelería Elizabeth está en línea y escuchando perfectamente!');
+        qrActual = null;
+        console.log('¡El bot de Pastelería Elizabeth está en línea y corriendo 24/7 en la nube!');
     });
 
     client.on('message', async (msg) => {
@@ -33,7 +68,7 @@ async function iniciarBot() {
                 `✨ *¡Hola! Soy Eli de la Pastelería Elizabeth.* 👩‍🍳🍰\n\n` +
                 `¡Qué alegría saludarte! ¿En qué te puedo ayudar hoy? Con gusto te atenderé.\n\n` +
                 `📸 *¡Síguenos en Instagram para ver nuestras delicias!* 👇\n` +
-                `https://www.instagram.com/pasteleria_elizabeth/?hl=es\n\n` +
+                `https://instagram.com\n\n` +
                 `Por favor, responde escribiendo el *número* o *palabra clave* de la opción que necesitas:\n\n` +
                 `1️⃣ Ver catálogo de Variedades 📋\n` +
                 `2️⃣ Requisitos de Pedidos y Datos de Transferencia 💵\n` +
@@ -56,7 +91,6 @@ async function iniciarBot() {
                 `✨ Escribe *Menu* para regresar al inicio.`
             );
         }
-
         // 2a. Listado de Empanadas
         else if (mensajeUsuario === 'empanadas') {
             await client.sendMessage(msg.from,
@@ -178,8 +212,8 @@ async function iniciarBot() {
                 `Uno de nuestros vendedores se contactará contigo en breve en este mismo chat para confirmar disponibilidad y tomar tu pedido. ¡Muchas gracias por tu paciencia! 👨‍🍳✨`
             );
 
-            // REEMPLAZA las X por el número donde la pastelería recibirá las alertas de los clientes (Ej: '56912345678@c.us')
-            const telefonoPanaderia = '56920941495@c.us'; 
+            // Reemplaza las X por el número donde la pastelería recibirá las alertas de los clientes
+            const telefonoPanaderia = '569XXXXXXXX@c.us'; 
             
             try {
                 const contactoCliente = await msg.getContact();
